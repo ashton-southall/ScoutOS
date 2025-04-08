@@ -5,6 +5,8 @@ import time
 import machine
 import secrets # Ensure a file named secrets.py is present in file structure, containing SSID details
 
+pingint = 1
+
 # Initialize an external LED on GPIO 16
 led = machine.Pin(16, machine.Pin.OUT)  # Set GPIO 16 as an output
 
@@ -19,39 +21,46 @@ def connect(): # Connect to WLAN - SSID in secrets.py
         time.sleep(1)
         
     if wlan.isconnected() == True:
-        print("ARNI-SCOUT Connected")
+        print(secrets.ssid, "Connected")
+        clearStatus()
         
 def check():
     try:
-        pico_led.on()
-        led.on()
         wlan = network.WLAN(network.STA_IF)
         
         if wlan.isconnected() == False:
             connect()
             return
         
-        addr = socket.getaddrinfo("google.com", 80)[0][-1]  # Resolve Google’s IP
-        s = socket.socket()
-        s.connect(addr)
-        s.settimeout(1)
-        s.send(b"GET / HTTP/1.1\r\nHost: google.com\r\n\r\n")
-        response = s.recv(1024)
-        print("Ping Success")
-        pico_led.off()
-        led.off()
-        s.close()
+        try:
+            # Try to open a socket to Google DNS
+            pico_led.on()
+            sock = socket.socket()
+            sock.settimeout(1)
+            sock.connect(("8.8.8.8", 53))
+            sock.close()
+            clearStatus()
+            return True
+        except:
+            led.on()
+            return
+    except:
+        print("Fatal Error: Aborting Check")
+        led.blink(0.5)
+        return
         
-    except Exception as e:
-        print("Ping failed:", e)
-        led.on()
+def clearStatus():
+    pico_led.off()
+    led.off()
+    return
 
 led.off()
 pico_led.blink(0.1)
 print("Booting")
 connect()
+clearStatus()
 
 while True:
     check()
-    time.sleep(5)
+    time.sleep(pingint)
 
